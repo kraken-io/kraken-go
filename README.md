@@ -16,6 +16,7 @@ import "github.com/kraken-io/kraken-go"
 
 ## Usage - Image URL
 
+````
 package main
 
 import (
@@ -47,9 +48,11 @@ func main() {
         log.Println("Success, Optimized image URL: ", data["kraked_url"])
     }
 }
-        
+````
+
 ## Usage - Image Upload
 
+````
 package main
 
 import (
@@ -82,3 +85,4 @@ func main() {
         log.Println("Success, Optimized image URL: ", data["kraked_url"])
     }
 }
+````
