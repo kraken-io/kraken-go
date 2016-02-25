@@ -33,7 +33,7 @@ func main() {
 
     params := map[string]interface {} {
         "wait": true,
-        "url":  "http://image-url.com/file.jpg"
+        "url": "http://image-url.com/file.jpg"
     }
 
     data, err := kr.URL(params)
