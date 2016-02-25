@@ -2,13 +2,13 @@
 
 ## Installation
 
-1. Download and install the package
+Download and install the package
 
 ````
 go get github.com/kraken-io/kraken-go
 ````
 
-2. Add Kraken.io package to your project
+Add Kraken.io package to your project
 
 ````
 import "github.com/kraken-io/kraken-go"
