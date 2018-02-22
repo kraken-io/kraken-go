@@ -16,7 +16,7 @@ import "github.com/kraken-io/kraken-go"
 
 ## Usage - Image URL
 
-````
+````golang
 package main
 
 import (
@@ -52,7 +52,7 @@ func main() {
 
 ## Usage - Image Upload
 
-````
+````golang
 package main
 
 import (
