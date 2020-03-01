@@ -49,7 +49,7 @@ func New(key, secret string) (*Kraken, error) {
 	}, nil
 }
 
-//URL makes request to the https://api.kraken.io/v1/upload endpoint
+// URL makes request to the https://api.kraken.io/v1/url endpoint
 func (kr *Kraken) URL(params map[string]interface{}) (map[string]interface{}, error) {
 	dataReq, err := kr.marshalParams(params)
 	if err != nil {
@@ -65,7 +65,7 @@ func (kr *Kraken) URL(params map[string]interface{}) (map[string]interface{}, er
 	return kr.doReq(req)
 }
 
-//Upload makes multipart request to the https://api.kraken.io/v1/url endpoint
+// Upload opens a file and makes multipart request to the https://api.kraken.io/v1/upload endpoint
 func (kr *Kraken) Upload(params map[string]interface{}, path string) (map[string]interface{}, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -73,6 +73,11 @@ func (kr *Kraken) Upload(params map[string]interface{}, path string) (map[string
 	}
 	defer file.Close()
 
+	return kr.UploadReader(params, file, filepath.Base(path))
+}
+
+// UploadReader makes multipart request to the https://api.kraken.io/v1/upload endpoint
+func (kr *Kraken) UploadReader(params map[string]interface{}, f io.Reader, name string) (map[string]interface{}, error) {
 	pipeReader, pipeWriter := io.Pipe()
 	writer := multipart.NewWriter(pipeWriter)
 
@@ -105,13 +110,13 @@ func (kr *Kraken) Upload(params map[string]interface{}, path string) (map[string
 			close(cancelCh)
 			return
 		}
-		uploadPart, err := writer.CreateFormFile("upload", filepath.Base(path))
+		uploadPart, err := writer.CreateFormFile("upload", name)
 		if err != nil {
 			errCh <- err
 			close(cancelCh)
 			return
 		}
-		_, err = io.Copy(uploadPart, file)
+		_, err = io.Copy(uploadPart, f)
 		if err != nil {
 			errCh <- err
 			close(cancelCh)
