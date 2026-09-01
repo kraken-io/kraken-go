@@ -1,13 +1,13 @@
-//Package kraken is the official client's implementation for Kraken.io API
-//https://github.com/kraken-io/kraken-go
+// Package kraken is the official client's implementation for Kraken.io API
+// https://github.com/kraken-io/kraken-go
 package kraken
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -15,12 +15,12 @@ import (
 )
 
 var (
-	//ErrNoCred indicates that api_key or api_secret were not specified
+	// ErrNoCred indicates that api_key or api_secret were not specified
 	ErrNoCred = fmt.Errorf("key and secret should be specified")
 )
 
-//ResponseError contains error encountered while processing HTTP response
-//with response itself
+// ResponseError contains error encountered while processing HTTP response
+// with response itself
 type ResponseError struct {
 	s    string
 	Resp *http.Response
@@ -28,14 +28,14 @@ type ResponseError struct {
 
 func (err *ResponseError) Error() string { return err.s }
 
-//Kraken holds api_key, api_secret, and HttpClient
+// Kraken holds api_key, api_secret, and HttpClient
 type Kraken struct {
 	auth map[string]string
-	//If not specified default http.Client{} is used
+	// If not specified default http.Client{} is used
 	HTTPClient *http.Client
 }
 
-//New creates new instance of Kraken. key and secret shouldn't be empty,otherwise ErrNoCred will be returned
+// New creates new instance of Kraken. key and secret shouldn't be empty,otherwise ErrNoCred will be returned
 func New(key, secret string) (*Kraken, error) {
 	if key == "" || secret == "" {
 		return nil, ErrNoCred
@@ -81,51 +81,49 @@ func (kr *Kraken) UploadReader(params map[string]interface{}, f io.Reader, name 
 	pipeReader, pipeWriter := io.Pipe()
 	writer := multipart.NewWriter(pipeWriter)
 
-	req, err := http.NewRequest("POST", "https://api.kraken.io/v1/upload", pipeReader)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.kraken.io/v1/upload", pipeReader)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Add("Content-Type", writer.FormDataContentType())
-	cancelCh := make(chan struct{})
-	req.Cancel = cancelCh
 
 	errCh := make(chan error, 1)
 	go func() {
 		defer pipeWriter.Close()
+		// Abort the request as well, so a failure while building the body does
+		// not leave it hanging on a reader that will never be written to.
+		fail := func(err error) {
+			errCh <- err
+			cancel()
+		}
 		data, err := kr.marshalParams(params)
 		if err != nil {
-			errCh <- err
-			close(cancelCh)
+			fail(err)
 			return
 		}
 		dataPart, err := writer.CreateFormField("data")
 		if err != nil {
-			errCh <- err
-			close(cancelCh)
+			fail(err)
 			return
 		}
-		_, err = dataPart.Write(data)
-		if err != nil {
-			errCh <- err
-			close(cancelCh)
+		if _, err = dataPart.Write(data); err != nil {
+			fail(err)
 			return
 		}
 		uploadPart, err := writer.CreateFormFile("upload", name)
 		if err != nil {
-			errCh <- err
-			close(cancelCh)
+			fail(err)
 			return
 		}
-		_, err = io.Copy(uploadPart, f)
-		if err != nil {
-			errCh <- err
-			close(cancelCh)
+		if _, err = io.Copy(uploadPart, f); err != nil {
+			fail(err)
 			return
 		}
-		err = writer.Close()
-		if err != nil {
-			errCh <- err
-			close(cancelCh)
+		if err = writer.Close(); err != nil {
+			fail(err)
 		}
 	}()
 
@@ -151,14 +149,14 @@ func (kr *Kraken) doReq(req *http.Request) (map[string]interface{}, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, &ResponseError{err.Error(), resp}
 	}
 	dataResp := make(map[string]interface{})
 	err = json.Unmarshal(body, &dataResp)
 	if err != nil {
-		resp.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+		resp.Body = io.NopCloser(bytes.NewBuffer(body))
 		return nil, &ResponseError{err.Error(), resp}
 	}
 	return dataResp, nil
