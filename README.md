@@ -1,88 +1,132 @@
-# The official Golang package for Kraken.io API
+# kraken-go
 
-## Installation
+[![ci](https://github.com/kraken-io/kraken-go/actions/workflows/ci.yml/badge.svg)](https://github.com/kraken-io/kraken-go/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kraken-io/kraken-go.svg)](https://pkg.go.dev/github.com/kraken-io/kraken-go)
 
-Download and install the package
+The official Go client for the [Kraken.io](https://kraken.io) image API.
 
-````
+Requires Go 1.21 or newer. Tested against 1.21 through 1.24.
+
+## Install
+
+```bash
 go get github.com/kraken-io/kraken-go
-````
+```
 
-Add Kraken.io package to your project
+## Usage
 
-````
-import "github.com/kraken-io/kraken-go"
-````
+Optimize an image by URL:
 
-## Usage - Image URL
-
-````golang
+```go
 package main
 
 import (
-    "log"
-    "github.com/kraken-io/kraken-go"
+	"log"
+
+	"github.com/kraken-io/kraken-go"
 )
 
 func main() {
-    kr, err := kraken.New("your-api-key", "your-api-secret")
+	kr, err := kraken.New("your-api-key", "your-api-secret")
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    if err != nil {
-        log.Fatal(err)
-    }
+	data, err := kr.URL(map[string]interface{}{
+		"wait":  true,
+		"lossy": true,
+		"url":   "https://example.com/file.jpg",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    params := map[string]interface {} {
-        "wait": true,
-        "url": "http://image-url.com/file.jpg"
-    }
-
-    data, err := kr.URL(params)
-
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    if data["success"] != true {
-        log.Println("Failed, error message ", data["message"])
-    } else {
-        log.Println("Success, Optimized image URL: ", data["kraked_url"])
-    }
+	if data["success"] != true {
+		log.Fatal("failed: ", data["message"])
+	}
+	log.Println("optimized:", data["kraked_url"])
 }
-````
+```
 
-## Usage - Image Upload
+Upload a file from disk:
 
-````golang
-package main
+```go
+data, err := kr.Upload(map[string]interface{}{
+	"wait":  true,
+	"lossy": true,
+}, "./photo.jpg")
+```
 
-import (
-    "log"
-    "github.com/kraken-io/kraken-go"
-)
+Upload from any `io.Reader` — an HTTP body, an S3 object, a buffer:
 
-func main() {
-    kr, err := kraken.New("your-api-key", "your-api-secret")
+```go
+data, err := kr.UploadReader(map[string]interface{}{"wait": true}, r, "photo.jpg")
+```
 
-    if err != nil {
-        log.Fatal(err)
-    }
+## Parameters
 
-    params := map[string]interface {} {
-        "wait": true
-    }
+`params` is passed to the API as-is, so **every API feature is available** —
+resizing, format conversion, metadata, WebP and AVIF output, and the cloud
+storage destinations. See the [API documentation](https://kraken.io/docs) for
+the full list.
 
-    imgPath := "./path/to/file/on/disk.jpg"
+```go
+data, err := kr.URL(map[string]interface{}{
+	"wait":  true,
+	"lossy": true,
+	"url":   "https://example.com/file.jpg",
+	"resize": map[string]interface{}{
+		"width":    800,
+		"height":   600,
+		"strategy": "fit",
+	},
+	"convert": map[string]interface{}{
+		"format": "webp",
+	},
+})
+```
 
-    data, err := kr.Upload(params, imgPath)
+`auth` is added for you from the credentials given to `New`; do not set it.
 
-    if err != nil {
-        log.Fatal("err ", err)
-    }
-    
-    if data["success"] != true {
-        log.Println("Failed, error message ", data["message"])
-    } else {
-        log.Println("Success, Optimized image URL: ", data["kraked_url"])
-    }
+## Errors
+
+Two kinds:
+
+| | |
+|---|---|
+| `error` from the call | transport failure, or a response that was not JSON |
+| `data["success"] == false` | the request reached the API and it declined |
+
+A non-JSON response comes back as `*ResponseError`, which carries the
+`*http.Response` so the status and body can be inspected:
+
+```go
+if respErr, ok := err.(*kraken.ResponseError); ok {
+	log.Println("status:", respErr.Resp.StatusCode)
 }
-````
+```
+
+`New` returns `ErrNoCred` if either credential is empty.
+
+## Custom HTTP client
+
+`HTTPClient` is exported, so timeouts, proxies and transports are yours to set:
+
+```go
+kr.HTTPClient = &http.Client{Timeout: 30 * time.Second}
+```
+
+## Development
+
+```bash
+go test ./...          # no network and no credentials required
+go vet ./...
+gofmt -l .
+```
+
+Tests run against a local `httptest` server. The examples in `example_test.go`
+are compiled by CI, so the usage documented here cannot drift from the code.
+
+## License
+
+See [LICENSE](LICENSE).
