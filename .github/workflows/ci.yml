@@ -34,5 +34,7 @@ jobs:
       - run: |
           out=$(gofmt -l .)
           if [ -n "$out" ]; then
-            echo "::error::not gofmt-clean:"; echo "$out"; exit 1
+            echo "::error::not gofmt-clean: $out"
+            gofmt -d .
+            exit 1
           fi
