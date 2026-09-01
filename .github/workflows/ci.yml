@@ -13,7 +13,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.21', '1.22', '1.23', '1.24']
+        # 1.16 is the floor the source actually needs (io.ReadAll). Keep it in
+        # the matrix so a change that raises it fails here, not for a user.
+        go: ['1.16', '1.18', '1.20', '1.21', '1.22', '1.23', '1.24']
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
